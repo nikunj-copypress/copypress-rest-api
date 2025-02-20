@@ -1,10 +1,20 @@
-# Copypress-Rest-API
+=== COPYPRESS REST API ===
+Contributors: CopyPress
+Tags: REST API, posts, categories, tags, post types, taxonomies, image upload
+Requires at least: 6.4
+Tested up to: 5.7
+Stable tag: trunk
+License: GPL2
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+
+== Description ==
 The **COPYPRESS REST API** plugin extends the WordPress REST API with custom endpoints for managing posts, categories, tags, post types, and taxonomies.
 
-== Installation ==
-1. Download the plugin files.
-2. Upload the plugin folder to the `/wp-content/plugins/` directory.
-3. Activate the plugin from the WordPress admin panel.
+### Features
+- Create, update, and delete posts via REST API.
+- Fetch categories, tags, post types, and taxonomies.
+- Supports CORS (Cross-Origin Resource Sharing) for making API requests from different origins.
+- Allows attaching images to posts via URLs.
 
 ### Endpoints
 1. `POST /copypress-api/v1/posts` - Create a new post.
@@ -39,7 +49,29 @@ The **COPYPRESS REST API** plugin extends the WordPress REST API with custom end
 7. `GET /copypress-api/v1/get-taxonomies/{post_type}` - Get all taxonomies (categories and tags) associated with a specific post type.
    - Response: List of categories (hierarchical taxonomies) and tags (non-hierarchical taxonomies).
 
+== Installation ==
+1. Download the plugin files.
+2. Upload the plugin folder to the `/wp-content/plugins/` directory.
+3. Activate the plugin from the WordPress admin panel.
+
+== CORS Support ==
+This plugin allows cross-origin requests for all the REST API endpoints, enabling requests from different domains.
+
+### Allowed Methods:
+- `GET`, `POST`, `PUT`, `DELETE`
+
+### Allowed Headers:
+- `Content-Type`, `X-Custom-Header`, `x-csrf-token`, `x-api-key`
+
+### Allowed Origin:
+- `*` (Any domain)
+
+== Usage ==
+Once the plugin is activated, the custom API routes are available for interaction with posts, categories, tags, post types, and taxonomies. You can make requests to the respective endpoints from any external application or client that can interact with REST APIs.
 
 == Changelog ==
 = 1.0.0 =
 * Initial release with functionality for post creation, update, deletion, and fetching categories, tags, post types, and taxonomies.
+
+== License ==
+This plugin is licensed under the GPLv2 license.
