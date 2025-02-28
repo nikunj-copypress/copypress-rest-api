@@ -73,18 +73,47 @@ class COPYPRESS_REST_API_Endpoints {
 
     // Create Post
     public function copypress_create_post( $data ) {
-        
-        // Handle post creation logic
         $title = isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : '';
-        $content = isset( $data['content'] ) ? sanitize_textarea_field( $data['content'] ) : '';
+        $content = isset( $data['content'] ) ?  $data['content'] : '';
         $excerpt = isset( $data['excerpt'] ) ? sanitize_textarea_field( $data['excerpt'] ) : '';
-        $category = isset( $data['category'] ) ? (int) $data['category'] : '';
+        $category_main = isset( $data['category_main'] ) ? sanitize_text_field( $data['category_main'] ) : '';
+        $category = isset( $data['category'] ) ? sanitize_text_field( $data['category'] ) : '';
+        $tags_main = isset( $data['tags_main'] ) ? sanitize_text_field( $data['tags_main'] ) : '';
         $tags = isset( $data['tags'] ) ? sanitize_text_field( $data['tags'] ) : '';
         $image_url = isset( $data['image'] ) ? esc_url_raw( $data['image'] ) : '';
         $post_type = isset( $data['post_type'] ) ? sanitize_text_field( $data['post_type'] ) : 'post';
         $author_id = isset( $data['author_id'] ) ? (int) $data['author_id'] : get_current_user_id(); // Default to current logged-in user
         $post_status = isset( $data['post_status'] ) ? sanitize_text_field( $data['post_status'] ) : '';
-
+    
+        // Handle category assignment
+        $cat_exists = get_term_by( 'slug', $category, $category_main ); // Get term by slug
+        if ( !$cat_exists ) {
+            // Create category if not exists
+            $cat_created = wp_insert_term( $category, $category_main );
+            if ( !is_wp_error( $cat_created ) ) {
+                $cat_id = $cat_created['term_id'];
+            }
+        } else {
+            $cat_id = $cat_exists->term_id;
+        }
+    
+        // Handle tag assignment
+        $tags_array = explode( ',', $tags ); // Split tags by comma
+        $tags_ids = [];
+        foreach ( $tags_array as $tag ) {
+            $tag_exists = get_term_by( 'slug', $tag, $tags_main ); // Get term by slug
+            if ( !$tag_exists ) {
+                // If the tag does not exist, create it
+                $tag_created = wp_insert_term( $tag, $tags_main );
+                if ( !is_wp_error( $tag_created ) ) {
+                    $tags_ids[] = $tag_created['term_id']; // Add the newly created term ID to the list
+                }
+            } else {
+                // If the tag exists, get its term ID
+                $tags_ids[] = $tag_exists->term_id;
+            }
+        }
+    
         // Validate required fields
         if ( empty( $title ) ) {
             return new WP_Error( 'missing_title', 'Please enter a title.', [ 'status' => 400 ] );
@@ -92,40 +121,42 @@ class COPYPRESS_REST_API_Endpoints {
         if ( empty( $content ) ) {
             return new WP_Error( 'missing_content', 'Please enter content.', [ 'status' => 400 ] );
         }
-       
+    
+        // Prepare the post array
         $postarr = [
             'post_title'   => $title,
             'post_content' => $content,
             'post_excerpt' => $excerpt,
             'post_status'  => $post_status,
-            'post_category' => [ $category ],
-            'tags_input'   => explode( ',', $tags ),
             'post_type'    => $post_type,
             'post_author'  => $author_id,
         ];
-
+    
+        // Insert the post into the database
         $post_id = wp_insert_post( $postarr );
         if ( $post_id ) {
-            
-            if ($image_url) {
-               
-                $image_id = COPYPRESS_REST_API_Image::copypress_handle_image($image_url, $post_id);
-                
-                if ($image_id) {
-                    set_post_thumbnail($post_id, $image_id);
+            // Set category and tags for the post
+            wp_set_object_terms( $post_id, $cat_id, $category_main );
+            wp_set_object_terms( $post_id, $tags_ids, $tags_main );
+    
+            // Handle the post image if provided
+            if ( $image_url ) {
+                $image_id = COPYPRESS_REST_API_Image::copypress_handle_image( $image_url, $post_id );
+                if ( $image_id ) {
+                    set_post_thumbnail( $post_id, $image_id );
                 }
             }
-           
+    
             return new WP_REST_Response( [
                 'message' => 'Post created successfully',
                 'status'  => 200,
                 'data'    => get_post( $post_id ),
             ], 200 );
         }
-
+    
         return new WP_Error( 'create_failed', 'Post creation failed', [ 'status' => 500 ] );
     }
-
+    
     // Update Post
     public function copypress_update_post( $data ) {
         // Handle post update logic
@@ -246,7 +277,7 @@ class COPYPRESS_REST_API_Endpoints {
     
         // Get all taxonomies associated with the post type
         $taxonomies = get_object_taxonomies( $post_type, 'objects' );
-    
+       
         if ( empty( $taxonomies ) ) {
             return new WP_REST_Response( 
                 array( 
@@ -257,10 +288,7 @@ class COPYPRESS_REST_API_Endpoints {
             );
         }
     
-        $response = array(
-            'categories' => array(),
-            'tags'       => array(),
-        );
+        $response = array();
     
         // Loop through each taxonomy and retrieve the terms
         foreach ( $taxonomies as $taxonomy ) {
@@ -269,6 +297,7 @@ class COPYPRESS_REST_API_Endpoints {
                 'hide_empty' => false,
             ) );
             
+
             // Check if terms are found for each taxonomy
             if ( ! empty( $terms ) ) {
                 $term_data = array();
@@ -283,10 +312,13 @@ class COPYPRESS_REST_API_Endpoints {
                
                 // Check if the taxonomy is hierarchical
                 if ( $taxonomy->hierarchical ) {
-                    $response['categories'] = $term_data; // Hierarchical taxonomies go to 'categories'
+                    // hierarchical taxonomies go to 'category'
+                    $response['categories'][$taxonomy->name] = $term_data; 
                 } else {
-                    $response['tags'] = $term_data; // Non-hierarchical taxonomies go to 'tags'
+                    // Non-hierarchical taxonomies go to 'tags'
+                    $response['tags'][$taxonomy->name] = $term_data; // You may want to collect all tags in a 'tags' array
                 }
+                
             }
         }
         
