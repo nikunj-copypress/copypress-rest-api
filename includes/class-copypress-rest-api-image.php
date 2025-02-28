@@ -37,6 +37,12 @@ class COPYPRESS_REST_API_Image {
             require_once(ABSPATH . 'wp-admin/includes/image.php');
             $attach_data = wp_generate_attachment_metadata( $attach_id, $upload_path );
             wp_update_attachment_metadata( $attach_id, $attach_data );
+
+            // Set as featured image (works for both classic and block editor)
+            if ( ! is_null( $post_id ) ) {
+                set_post_thumbnail( $post_id, $attach_id );
+            }
+
             return $attach_id;
         }
 
