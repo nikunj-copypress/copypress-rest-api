@@ -52,6 +52,12 @@ class COPYPRESS_REST_API_Endpoints {
             'callback'            => [ $this, 'copypress_get_taxonomy_by_post_type' ],
             'permission_callback' => '__return_true',
         ] );
+
+        register_rest_route( 'copypress-api/v1', '/dante-authors', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'copypress_get_dante_users' ],
+            'permission_callback' => '__return_true',
+        ]);
     }
 
     // Enable CORS for WordPress REST API
@@ -332,6 +338,42 @@ class COPYPRESS_REST_API_Endpoints {
             200 
         );
     }
+
+    // Fetch the list of Dante authors
+    public function copypress_get_dante_users() {
+        // Query all users without filtering by meta_key
+        $args = [
+            'fields' => ['ID', 'user_login', 'user_email'],  // Specify the fields you want to return
+        ];
+    
+        $users = get_users($args);
+    
+        // Remove duplicates by user ID if needed
+        $unique_users = [];
+        foreach ($users as $user) {
+            $unique_users[$user->ID] = $user;
+        }
+        $users = array_values($unique_users); // Reindex the array
+    
+        // Prepare the response
+        $response = [];
+        foreach ($users as $user) {
+            $response[] = [
+                'id'    => $user->ID,
+                'login' => $user->user_login,
+                'email' => $user->user_email,
+            ];
+        }
+    
+        return new WP_REST_Response(
+            array(
+                'message' => 'All User List retrieved successfully.',
+                'status'  => '200',
+                'data'    => $response,
+            ),
+            200
+        );
+    }    
 
 }
 
