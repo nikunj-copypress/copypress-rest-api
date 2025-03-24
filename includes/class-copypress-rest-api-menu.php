@@ -12,17 +12,28 @@ class COPYPRESS_REST_API_Menu {
     // Enqueue CSS styles
     public function copypress_admin_enqueue_scripts() {
         if (isset($_GET['page']) && $_GET['page'] === 'copypress-rest-api') {
-            wp_enqueue_style( 'copypress-rest-api', plugin_dir_url( __FILE__ ) . '../assets/css/copypress-rest-api.css', [], '1.0.0' );
+            if (isset($_GET['_wpnonce'])) {
+                $nonce = sanitize_text_field(wp_unslash($_GET['_wpnonce'])); // Unslash and sanitize nonce
+
+                if (wp_verify_nonce($nonce, 'copypress_admin_action')) {
+                    wp_enqueue_style('copypress-rest-api', plugin_dir_url(__FILE__) . '../assets/css/copypress-rest-api.css', [], '1.0.0');
+                } else {
+                    wp_die(esc_html__('Nonce verification failed.', 'copypress-rest-api'));
+                }
+            }
         }
     }
 
     // Add the menu page to the WordPress admin
     public function copypress_add_admin_menu() {
+        $menu_slug = 'copypress-rest-api';
+        $menu_url  = add_query_arg('_wpnonce', wp_create_nonce('copypress_admin_action'), admin_url('admin.php?page=' . $menu_slug));
+
         add_menu_page(
-            'CP Rest API',
-            'CP Rest API',
+            esc_html__('CP Rest API', 'copypress-rest-api'),
+            esc_html__('CP Rest API', 'copypress-rest-api'),
             'manage_options',
-            'copypress-rest-api',
+            $menu_slug,
             [ $this, 'copypress_admin_page' ],
             'dashicons-admin-tools',
             60
@@ -55,7 +66,7 @@ class COPYPRESS_REST_API_Menu {
                         update_option( 'copypress_rest_api_integration_key', $jwt_token );
     
                         // Display success message
-                        echo '<div class="updated"><p><strong>' . __('JWT Token generated successfully!', 'copypress-rest-api') . '</strong></p></div>';
+                        echo '<div class="updated"><p><strong>' . esc_html('JWT Token generated successfully!', 'copypress-rest-api') . '</strong></p></div>';
                     } else {
                         echo '<div class="error"><p><strong>' . esc_html_e('You must be logged in to generate a JWT token.', 'copypress-rest-api') . '</strong></p></div>';
                     }
@@ -68,7 +79,7 @@ class COPYPRESS_REST_API_Menu {
             <form method="post" action="" style="max-width: 600px; padding: 20px; background-color: #f9f9f9; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
                 <table class="form-table">
                     <tr valign="top">
-                        <th scope="row"><label for="copypress_api_key"><?php esc_html_e( 'API Key', 'copypress-rest-api' ); ?></label></th>
+                        <th scope="row"><label for="copypress_api_key"><?php echo  esc_html__( 'API Key', 'copypress-rest-api' ); ?></label></th>
                         <td>
                             <input type="text" name="copypress_api_key" id="copypress_api_key" class="regular-text" value="<?php echo esc_html( get_option( 'copypress_rest_api_integration_key' ) ); ?>" readonly />
                             <p class="description"><?php esc_html_e( 'This is the generated API key. You can use it for the integration.', 'copypress-rest-api' ); ?></p>

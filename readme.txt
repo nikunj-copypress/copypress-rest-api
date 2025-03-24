@@ -1,11 +1,13 @@
-=== COPYPRESS REST API ===
-Contributors: CopyPress
-Tags: REST API, posts, categories, tags, post types, taxonomies, image upload
-Requires at least: 6.4
-Tested up to: 5.7
-Stable tag: trunk
-License: GPL2
-License URI: http://www.gnu.org/licenses/gpl-2.0.html
+=== Copypress Rest API ===
+Contributors: CopyPress  
+Tags: REST API, posts, categories, tags, image upload
+Requires at least: 6.4  
+Tested up to: 6.7  
+Stable tag: 1.0 
+License: GPL2  
+License URI: http://www.gnu.org/licenses/gpl-2.0.html  
+
+Extend the WordPress REST API with custom endpoints for managing posts, categories, tags, post types, and taxonomies.
 
 == Description ==
 The **COPYPRESS REST API** plugin extends the WordPress REST API with custom endpoints for managing posts, categories, tags, post types, and taxonomies.
