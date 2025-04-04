@@ -1,9 +1,9 @@
 === Copypress Rest API ===
-Contributors: CopyPress  
+Contributors: copypressdev  
 Tags: REST API, posts, categories, tags, image upload
 Requires at least: 6.4  
 Tested up to: 6.7  
-Stable tag: 1.0 
+Stable tag: 1.1 
 License: GPL2  
 License URI: http://www.gnu.org/licenses/gpl-2.0.html  
 
@@ -63,7 +63,7 @@ This plugin allows cross-origin requests for all the REST API endpoints, enablin
 - `GET`, `POST`, `PUT`, `DELETE`
 
 ### Allowed Headers:
-- `Content-Type`, `X-Custom-Header`, `x-csrf-token`, `x-api-key`
+- `Content-Type`, `X-Custom-Header`, `x-csrf-token`, `Authorization`
 
 ### Allowed Origin:
 - `*` (Any domain)
@@ -72,7 +72,13 @@ This plugin allows cross-origin requests for all the REST API endpoints, enablin
 Once the plugin is activated, the custom API routes are available for interaction with posts, categories, tags, post types, and taxonomies. You can make requests to the respective endpoints from any external application or client that can interact with REST APIs.
 
 == Changelog ==
-= 1.0.0 =
+= 1.1 =
+* added permission check.
+* added login with token solution.
+* removed api-key based functionality.
+
+== Changelog ==
+= 1.0 =
 * Initial release with functionality for post creation, update, deletion, and fetching categories, tags, post types, and taxonomies.
 
 == License ==

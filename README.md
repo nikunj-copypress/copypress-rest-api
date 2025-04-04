@@ -39,7 +39,12 @@ The **COPYPRESS REST API** plugin extends the WordPress REST API with custom end
 7. `GET /copypress-api/v1/get-taxonomies/{post_type}` - Get all taxonomies (categories and tags) associated with a specific post type.
    - Response: List of categories (hierarchical taxonomies) and tags (non-hierarchical taxonomies).
 
+== Changelog ==
+= 1.1 =
+* added permission check.
+* added login with token solution.
+* removed api-key based functionality.
 
 == Changelog ==
-= 1.0.0 =
+= 1.0 =
 * Initial release with functionality for post creation, update, deletion, and fetching categories, tags, post types, and taxonomies.

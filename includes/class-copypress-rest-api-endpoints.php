@@ -3,82 +3,159 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class COPYPRESS_REST_API_Endpoints {
+class COPYREAP_REST_API_Endpoints {
     public function __construct() {
-        add_action( 'rest_api_init', [ $this, 'copypress_register_routes' ] );
-        add_action( 'rest_api_init', [ $this, 'enable_cors_in_wp_rest' ], 15 );
+        add_action( 'rest_api_init', [ $this, 'copyreap_register_routes_endpoint' ] );
+        add_action( 'rest_api_init', [ $this, 'copyreap_enable_cors_in_wp_rest' ], 15 );
     }
 
     // Register all the API routes
-    public function copypress_register_routes() {
+    public function copyreap_register_routes_endpoint() {
+        register_rest_route('copypress-api/v1', '/login', [
+            'methods' => 'POST',
+            'callback' => [$this, 'copyreap_login_user'],
+            'permission_callback' => '__return_true'
+        ]);
+
         register_rest_route( 'copypress-api/v1', '/posts', [
             'methods'             => 'POST',
-            'callback'            => [ $this, 'copypress_create_post' ],
-            'permission_callback' => '__return_true',
+            'callback'            => [$this, 'copyreap_create_post' ],
+            'permission_callback' => [$this, 'copyreap_jwt_permission_check']
         ]);
 
         register_rest_route( 'copypress-api/v1', '/posts/(?P<id>\d+)', [
             'methods'             => 'PUT',
-            'callback'            => [ $this, 'copypress_update_post' ],
-            'permission_callback' => '__return_true',
+            'callback'            => [ $this, 'copyreap_update_post' ],
+            'permission_callback' => [$this, 'copyreap_jwt_permission_check']
         ]);
 
         register_rest_route( 'copypress-api/v1', '/posts/(?P<id>\d+)', [
             'methods'             => 'DELETE',
-            'callback'            => [ $this, 'copypress_delete_post' ],
-            'permission_callback' => '__return_true',
+            'callback'            => [ $this, 'copyreap_delete_post' ],
+            'permission_callback' => [$this, 'copyreap_jwt_permission_check']
         ]);
 
         register_rest_route( 'copypress-api/v1', '/categories', [
             'methods'             => 'GET',
-            'callback'            => [ $this, 'copypress_get_categories' ],
-            'permission_callback' => '__return_true',
+            'callback'            => [ $this, 'copyreap_get_categories' ],
+            'permission_callback' => [$this, 'copyreap_jwt_permission_check']
         ]);
 
         register_rest_route( 'copypress-api/v1', '/tags', [
             'methods'             => 'GET',
-            'callback'            => [ $this, 'copypress_get_tags' ],
-            'permission_callback' => '__return_true',
+            'callback'            => [ $this, 'copyreap_get_tags' ],
+            'permission_callback' => [$this, 'copyreap_jwt_permission_check']
         ]);
 
         register_rest_route( 'copypress-api/v1', '/post-types', [
             'methods'             => 'GET',
-            'callback'            => [ $this, 'copypress_get_post_types' ],
-            'permission_callback' => '__return_true',
+            'callback'            => [ $this, 'copyreap_get_post_types' ],
+            'permission_callback' => [$this, 'copyreap_jwt_permission_check']
         ]);
 
         register_rest_route( 'copypress-api/v1', '/get-taxonomies/(?P<post_type>[a-zA-Z0-9_-]+)', [
             'methods'             => 'GET',
-            'callback'            => [ $this, 'copypress_get_taxonomy_by_post_type' ],
-            'permission_callback' => '__return_true',
+            'callback'            => [ $this, 'copyreap_get_taxonomy_by_post_type' ],
+            'permission_callback' => [$this, 'copyreap_jwt_permission_check']
         ] );
 
         register_rest_route( 'copypress-api/v1', '/dante-authors', [
             'methods'             => 'GET',
-            'callback'            => [ $this, 'copypress_get_dante_users' ],
-            'permission_callback' => '__return_true',
+            'callback'            => [ $this, 'copyreap_get_dante_users' ],
+            'permission_callback' => [$this, 'copyreap_jwt_permission_check']
         ]);
     }
 
-    // Enable CORS for WordPress REST API
-    public function enable_cors_in_wp_rest() {
-        header("Access-Control-Allow-Origin: *");
-        header("Access-Control-Allow-Headers: Content-Type, X-Custom-Header, x-csrf-token, x-api-key");
-        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
-        header("Access-Control-Allow-Credentials: true");
-
-        // Handle OPTIONS preflight request
-        if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            header("Access-Control-Allow-Origin: *");
-            header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
-            header("Access-Control-Allow-Headers: Content-Type, X-Custom-Header, x-csrf-token, x-api-key");
-            header("Access-Control-Allow-Credentials: true");
-            exit(0); // Respond immediately to OPTIONS request
+    function copyreap_login_user(WP_REST_Request $request) {
+        // Get username and password from the request
+        $username = $request->get_param('username');
+        $password = $request->get_param('password');
+    
+        // Validate that username and password are provided
+        if (empty($username) || empty($password)) {
+            return new WP_Error('missing_credentials', 'Username and password are required.', ['status' => 400]);
         }
+    
+        // Authenticate the user
+        $user = wp_authenticate($username, $password);
+    
+        // Check if authentication failed
+        if (is_wp_error($user)) {
+            return new WP_Error('invalid_credentials', 'Invalid username or password.', ['status' => 403]);
+        }
+    
+        // If authentication is successful, generate a JWT token
+        $jwt = new COPYREAP_JWT_Token();
+        $token = $jwt->copyreap_generate_token($user);
+    
+        // Return the token in the response
+        return rest_ensure_response([
+            'token' => $token,
+            'user_id' => $user->ID,
+            'username' => $user->user_login
+        ]);
+    }    
+
+    public function copyreap_jwt_permission_check() {
+        // Fetch headers manually from $_SERVER for compatibility with all environments
+        $auth_header = null;
+    
+        // Check and unslash the AUTHORIZATION header if it exists
+        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            // Sanitize the input value before using it
+            $auth_header = sanitize_text_field(wp_unslash($_SERVER['HTTP_AUTHORIZATION'])); 
+        } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            // Handle situations where the 'HTTP_AUTHORIZATION' header is rewritten
+            $auth_header = sanitize_text_field(wp_unslash($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])); 
+        }
+    
+        if (!$auth_header) {
+            return false;
+        }
+    
+        // Ensure it's a Bearer token
+        if (strpos($auth_header, 'Bearer ') !== 0) {
+            return false;
+        }
+    
+        // Extract token
+        $token = substr($auth_header, 7);
+        $jwt = new COPYREAP_JWT_Token();
+        $user_data = $jwt->copyreap_validate_token($token);
+    
+        if (!$user_data) {
+            return false;
+        }
+    
+        wp_set_current_user($user_data['user_id']);
+    
+        // Return the appropriate capability check, e.g., 'manage_options' for admin access
+        return current_user_can('manage_options');
     }
+    
+    public function copyreap_enable_cors_in_wp_rest() {
+        // Ensure this is only for REST API requests and unslash $_SERVER['REQUEST_URI']
+        if (isset($_SERVER['REQUEST_URI'])) {
+            // Sanitize the input value before using it
+            $request_uri = sanitize_text_field(wp_unslash($_SERVER['REQUEST_URI'])); 
+    
+            if (strpos($request_uri, '/wp-json/') !== false) {
+                header("Access-Control-Allow-Origin: *");
+                header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+                header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Custom-Header, x-csrf-token");
+                header("Access-Control-Allow-Credentials: true");
+    
+                // Handle preflight (OPTIONS) request
+                if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+                    status_header(200);
+                    exit();
+                }
+            }
+        }
+    }    
 
     // Create Post
-    public function copypress_create_post( $data ) {
+    public function copyreap_create_post( $data ) {
         $title = isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : '';
         $content = isset( $data['content'] ) ?  $data['content'] : '';
         $excerpt = isset( $data['excerpt'] ) ? sanitize_textarea_field( $data['excerpt'] ) : '';
@@ -147,7 +224,7 @@ class COPYPRESS_REST_API_Endpoints {
     
             // Handle the post image if provided
             if ( $image_url ) {
-                $image_id = COPYPRESS_REST_API_Image::copypress_handle_image( $image_url, $post_id );
+                $image_id = COPYREAP_REST_API_Image::copyreap_handle_image( $image_url, $post_id );
                 if ( $image_id ) {
                     set_post_thumbnail( $post_id, $image_id );
                 }
@@ -164,7 +241,7 @@ class COPYPRESS_REST_API_Endpoints {
     }
     
     // Update Post
-    public function copypress_update_post( $data ) {
+    public function copyreap_update_post( $data ) {
         // Handle post update logic
         $post_id = (int) $data['id'];
         $title = isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : '';
@@ -196,7 +273,7 @@ class COPYPRESS_REST_API_Endpoints {
         $updated_post_id = wp_update_post( $postarr );
         if ( $updated_post_id ) {
             if ($image_url) {
-                $image_id = copypress_handle_image($image_url, $updated_post_id);
+                $image_id = copyreap_handle_image($image_url, $updated_post_id);
                 if ($image_id) {
                     set_post_thumbnail($updated_post_id, $image_id);
                 }
@@ -212,7 +289,7 @@ class COPYPRESS_REST_API_Endpoints {
     }
 
     // Delete Post
-    public function copypress_delete_post( $data ) {
+    public function copyreap_delete_post( $data ) {
         // Handle post deletion logic
         $post_id = (int) $data['id'];
         if ( wp_delete_post( $post_id, true ) ) {
@@ -226,7 +303,7 @@ class COPYPRESS_REST_API_Endpoints {
     }
 
     // Fetch categories
-    public function copypress_get_categories() {
+    public function copyreap_get_categories() {
         $categories = get_categories( ['hide_empty' => false] );
         $response = [];
         
@@ -242,7 +319,7 @@ class COPYPRESS_REST_API_Endpoints {
     }
 
     // Fetch tags
-    public function copypress_get_tags() {
+    public function copyreap_get_tags() {
         $tags = get_tags( ['hide_empty' => false] );
         $response = [];
         
@@ -258,7 +335,7 @@ class COPYPRESS_REST_API_Endpoints {
     }
 
     // Fetch post types
-    public function copypress_get_post_types() {
+    public function copyreap_get_post_types() {
         $post_types = get_post_types( ['public' => true], 'objects' );
         $response = [];
 
@@ -273,7 +350,7 @@ class COPYPRESS_REST_API_Endpoints {
     }
 
     // Fetch Taxonomy by post-type
-    public function copypress_get_taxonomy_by_post_type( $data ) {
+    public function copyreap_get_taxonomy_by_post_type( $data ) {
         $post_type = $data['post_type'];
     
         // Check if the post type is valid
@@ -340,7 +417,7 @@ class COPYPRESS_REST_API_Endpoints {
     }
 
     // Fetch the list of Dante authors
-    public function copypress_get_dante_users() {
+    public function copyreap_get_dante_users() {
         // Query all users without filtering by meta_key
         $args = [
             'fields' => ['ID', 'user_login', 'user_email'],  // Specify the fields you want to return
@@ -377,4 +454,4 @@ class COPYPRESS_REST_API_Endpoints {
 
 }
 
-new COPYPRESS_REST_API_Endpoints();
+new COPYREAP_REST_API_Endpoints();

@@ -1,18 +1,17 @@
-/* copypress-rest-api.css */
-.cp-main h2 {
+.copyreap-main h2 {
     font-size: 24px;
     margin-bottom: 20px;
 }
 
-.cp-main .form-table th {
+.copyreap-main .form-table th {
     width: 20%;
 }
 
-.cp-main .form-table td {
+.copyreap-main .form-table td {
     width: 80%;
 }
 
-.cp-main .button-primary {
+.copyreap-main .button-primary {
     background-color: #0073aa;
     color: #fff;
     border: none;
@@ -23,17 +22,17 @@
     cursor: pointer;
 }
 
-.cp-main .button-primary:hover {
+.copyreap-main .button-primary:hover {
     background-color: #006799;
 }
 
-.cp-main .notice-success {
+.copyreap-main .notice-success {
     background-color: #d4edda;
     border-color: #c3e6cb;
     color: #155724;
 }
 
-.cp-main .updated {
+.copyreap-main .updated {
     background-color: #f0f8ff;
     border-color: #cce5ff;
     color: #31708f;

@@ -3,13 +3,13 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class COPYPRESS_REST_API_Image {
+class COPYREAP_REST_API_Image {
     public function __construct() {
         // Image handling logic can be placed here if needed
     }
 
     // Handle image upload
-    public static function copypress_handle_image( $image_url, $post_id = null ) {
+    public static function copyreap_handle_image( $image_url, $post_id = null ) {
         if ( ! filter_var( $image_url, FILTER_VALIDATE_URL ) ) {
             return new WP_Error( 'invalid_image_url', 'Provided image URL is invalid.' );
         }
@@ -50,4 +50,4 @@ class COPYPRESS_REST_API_Image {
     }
 }
 
-new COPYPRESS_REST_API_Image();
+new COPYREAP_REST_API_Image();
