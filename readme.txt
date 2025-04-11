@@ -3,7 +3,7 @@ Contributors: copypressdev
 Tags: REST API, posts, categories, tags, image upload
 Requires at least: 6.4  
 Tested up to: 6.7  
-Stable tag: 1.1 
+Stable tag: 1.2 
 License: GPL2  
 License URI: http://www.gnu.org/licenses/gpl-2.0.html  
 
@@ -19,7 +19,12 @@ The **COPYPRESS REST API** plugin extends the WordPress REST API with custom end
 - Allows attaching images to posts via URLs.
 
 ### Endpoints
-1. `POST /copypress-api/v1/posts` - Create a new post.
+1. `/copypress-api/v1/login` - Login with username and password to get a JWT token.
+   - Request Body:
+   - `username` (string): WordPress username
+   - `password` (string): WordPress password
+
+2. `POST /copypress-api/v1/posts` - Create a new post.
    - Request Body: 
      - `title` (string): The title of the post.
      - `content` (string): The content of the post.
@@ -32,23 +37,23 @@ The **COPYPRESS REST API** plugin extends the WordPress REST API with custom end
      - `post_status` (string): Post publish status.
    - Response: Success message, HTTP status code, and created post object.
 
-2. `PUT /copypress-api/v1/posts/{id}` - Update an existing post.
+3. `PUT /copypress-api/v1/posts/{id}` - Update an existing post.
    - Request Body: Same as `POST` endpoint.
    - Response: Success message, HTTP status code, and updated post object.
 
-3. `DELETE /copypress-api/v1/posts/{id}` - Delete a post.
+4. `DELETE /copypress-api/v1/posts/{id}` - Delete a post.
    - Response: Success message and HTTP status code.
 
-4. `GET /copypress-api/v1/categories` - Get all categories.
+5. `GET /copypress-api/v1/categories` - Get all categories.
    - Response: Category ID, name, and slug.
 
-5. `GET /copypress-api/v1/tags` - Get all tags.
+6. `GET /copypress-api/v1/tags` - Get all tags.
    - Response: Tag ID, name, and slug.
 
-6. `GET /copypress-api/v1/post-types` - Get all public post types.
+7. `GET /copypress-api/v1/post-types` - Get all public post types.
    - Response: Post type name and label.
 
-7. `GET /copypress-api/v1/get-taxonomies/{post_type}` - Get all taxonomies (categories and tags) associated with a specific post type.
+8. `GET /copypress-api/v1/get-taxonomies/{post_type}` - Get all taxonomies (categories and tags) associated with a specific post type.
    - Response: List of categories (hierarchical taxonomies) and tags (non-hierarchical taxonomies).
 
 == Installation ==
@@ -69,15 +74,18 @@ This plugin allows cross-origin requests for all the REST API endpoints, enablin
 - `*` (Any domain)
 
 == Usage ==
-Once the plugin is activated, the custom API routes are available for interaction with posts, categories, tags, post types, and taxonomies. You can make requests to the respective endpoints from any external application or client that can interact with REST APIs.
+Once the plugin is activated, the custom API routes are available for interaction with posts, categories, tags, post types, and taxonomies. You can make requests to the respective endpoints from any external application or client that can interact with REST APIs. To create or update posts, a valid JWT token must be provided in the Authorization header as:
+Authorization: Bearer YOUR_TOKEN_HERE
 
 == Changelog ==
+= 1.2 =
+* Role-based permissions for Administrator, Editor, and Contributor to publish content have been added.
+
 = 1.1 =
 * added permission check.
 * added login with token solution.
 * removed api-key based functionality.
 
-== Changelog ==
 = 1.0 =
 * Initial release with functionality for post creation, update, deletion, and fetching categories, tags, post types, and taxonomies.
 

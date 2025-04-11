@@ -97,28 +97,18 @@ class COPYREAP_REST_API_Endpoints {
     }    
 
     public function copyreap_jwt_permission_check() {
-        // Fetch headers manually from $_SERVER for compatibility with all environments
         $auth_header = null;
     
-        // Check and unslash the AUTHORIZATION header if it exists
         if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            // Sanitize the input value before using it
             $auth_header = sanitize_text_field(wp_unslash($_SERVER['HTTP_AUTHORIZATION'])); 
         } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-            // Handle situations where the 'HTTP_AUTHORIZATION' header is rewritten
             $auth_header = sanitize_text_field(wp_unslash($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])); 
         }
     
-        if (!$auth_header) {
+        if (!$auth_header || strpos($auth_header, 'Bearer ') !== 0) {
             return false;
         }
     
-        // Ensure it's a Bearer token
-        if (strpos($auth_header, 'Bearer ') !== 0) {
-            return false;
-        }
-    
-        // Extract token
         $token = substr($auth_header, 7);
         $jwt = new COPYREAP_JWT_Token();
         $user_data = $jwt->copyreap_validate_token($token);
@@ -129,9 +119,16 @@ class COPYREAP_REST_API_Endpoints {
     
         wp_set_current_user($user_data['user_id']);
     
-        // Return the appropriate capability check, e.g., 'manage_options' for admin access
-        return current_user_can('manage_options');
-    }
+        // ✅ Allow multiple roles
+        $allowed_roles = ['administrator', 'editor', 'contributor'];
+        $user = get_user_by('id', $user_data['user_id']);
+        
+        if ($user && array_intersect($allowed_roles, (array) $user->roles)) {
+            return true;
+        }
+    
+        return false;
+    }    
     
     public function copyreap_enable_cors_in_wp_rest() {
         // Ensure this is only for REST API requests and unslash $_SERVER['REQUEST_URI']
