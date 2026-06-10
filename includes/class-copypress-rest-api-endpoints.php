@@ -23,17 +23,17 @@ class COPYREAP_REST_API_Endpoints {
             'permission_callback' => [$this, 'copyreap_jwt_permission_check']
         ]);
 
-        register_rest_route( 'copypress-api/v1', '/posts/(?P<id>\d+)', [
-            'methods'             => 'PUT',
-            'callback'            => [ $this, 'copyreap_update_post' ],
-            'permission_callback' => [$this, 'copyreap_jwt_permission_check']
-        ]);
+        // register_rest_route( 'copypress-api/v1', '/posts/(?P<id>\d+)', [
+        //     'methods'             => 'PUT',
+        //     'callback'            => [ $this, 'copyreap_update_post' ],
+        //     'permission_callback' => [$this, 'copyreap_jwt_permission_check']
+        // ]);
 
-        register_rest_route( 'copypress-api/v1', '/posts/(?P<id>\d+)', [
-            'methods'             => 'DELETE',
-            'callback'            => [ $this, 'copyreap_delete_post' ],
-            'permission_callback' => [$this, 'copyreap_jwt_permission_check']
-        ]);
+        // register_rest_route( 'copypress-api/v1', '/posts/(?P<id>\d+)', [
+        //     'methods'             => 'DELETE',
+        //     'callback'            => [ $this, 'copyreap_delete_post' ],
+        //     'permission_callback' => [$this, 'copyreap_jwt_permission_check']
+        // ]);
 
         register_rest_route( 'copypress-api/v1', '/categories', [
             'methods'             => 'GET',
@@ -67,6 +67,20 @@ class COPYREAP_REST_API_Endpoints {
     }
 
     function copyreap_login_user(WP_REST_Request $request) {
+
+        $rate_limit = $this->copyreap_rate_limit_check(
+            'copyreap_login_' . md5(
+                sanitize_text_field(
+                    wp_unslash( $_SERVER['REMOTE_ADDR'] ?? 'unknown' )
+                )
+            ),
+            5
+        );
+
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         // Get username and password from the request
         $username = $request->get_param('username');
         $password = $request->get_param('password');
@@ -97,37 +111,66 @@ class COPYREAP_REST_API_Endpoints {
     }    
 
     public function copyreap_jwt_permission_check() {
-        $auth_header = null;
+
+        $auth_header = $this->copyreap_get_auth_header();
     
-        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            $auth_header = sanitize_text_field(wp_unslash($_SERVER['HTTP_AUTHORIZATION'])); 
-        } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-            $auth_header = sanitize_text_field(wp_unslash($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])); 
-        }
+        if (empty($auth_header)) { return new WP_Error( 'missing_token', 'Authorization header missing', ['status' => 401] ); }
     
-        if (!$auth_header || strpos($auth_header, 'Bearer ') !== 0) {
-            return false;
-        }
+        if ( !preg_match( '/Bearer\s+(\S+)/i', $auth_header, $matches ) ) { return new WP_Error( 'invalid_header', 'Bearer token missing', ['status' => 401] ); }
     
-        $token = substr($auth_header, 7);
+        $token = trim($matches[1]);
+
         $jwt = new COPYREAP_JWT_Token();
+
         $user_data = $jwt->copyreap_validate_token($token);
     
-        if (!$user_data) {
-            return false;
-        }
+        if ( !$user_data || empty($user_data['user_id']) ) { return new WP_Error( 'invalid_token', 'Token expired or invalid', ['status' => 403] ); }
     
-        wp_set_current_user($user_data['user_id']);
+        $user = get_user_by( 'id', (int) $user_data['user_id'] );
     
-        // ✅ Allow multiple roles
-        $allowed_roles = ['administrator', 'editor', 'contributor'];
-        $user = get_user_by('id', $user_data['user_id']);
+        if (!$user) { return new WP_Error( 'user_not_found', 'User not found', ['status' => 403] ); }
+
+        wp_set_current_user($user->ID);
+
+        $allowed_roles = [ 'administrator', 'editor', 'contributor' ];
+
+        $user_roles = (array) $user->roles;
         
-        if ($user && array_intersect($allowed_roles, (array) $user->roles)) {
+        if ( empty( array_intersect( $allowed_roles, $user_roles ) ) ) { return new WP_Error( 'insufficient_permissions', 'You do not have permission to access this endpoint', ['status' => 403] ); }
+
             return true;
-        }
+    }
     
-        return false;
+    private function copyreap_get_auth_header() {
+
+        $headers = [];
+
+        if (function_exists('getallheaders')) { $headers = getallheaders(); }
+
+        if (!empty($headers['Authorization'])) { return trim($headers['Authorization']); }
+
+        if (!empty($headers['authorization'])) { return trim($headers['authorization']); }
+
+        if (!empty($_SERVER['HTTP_AUTHORIZATION'])) { return trim( sanitize_text_field( wp_unslash($_SERVER['HTTP_AUTHORIZATION']) ) ); }
+
+        if (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) { return trim( sanitize_text_field( wp_unslash($_SERVER['REDIRECT_HTTP_AUTHORIZATION']) ) ); }
+
+        return null;
+    }
+
+    private function copyreap_rate_limit_check( $key, $limit = 20 ) {
+
+        $requests = (int) get_transient( $key );
+
+        if ( $requests >= $limit ) { return new WP_Error( 'rate_limit_exceeded', sprintf( 'Maximum %d requests per minute allowed.', $limit ), [ 'status' => 429 ] ); }
+
+        set_transient(
+            $key,
+            $requests + 1,
+            MINUTE_IN_SECONDS
+        );
+
+        return true;
     }    
     
     public function copyreap_enable_cors_in_wp_rest() {
@@ -153,8 +196,18 @@ class COPYREAP_REST_API_Endpoints {
 
     // Create Post
     public function copyreap_create_post( $data ) {
+
+        $rate_limit = $this->copyreap_rate_limit_check(
+            'copyreap_create_' . get_current_user_id(),
+            20
+        );
+
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         $title = isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : '';
-        $content = isset( $data['content'] ) ?  $data['content'] : '';
+        $content = isset( $data['content'] ) ? wp_kses_post( $data['content'] ) : '';
         $excerpt = isset( $data['excerpt'] ) ? sanitize_textarea_field( $data['excerpt'] ) : '';
         $category_main = isset( $data['category_main'] ) ? sanitize_text_field( $data['category_main'] ) : '';
         $category = isset( $data['category'] ) ? sanitize_text_field( $data['category'] ) : '';
@@ -162,8 +215,49 @@ class COPYREAP_REST_API_Endpoints {
         $tags = isset( $data['tags'] ) ? sanitize_text_field( $data['tags'] ) : '';
         $image_url = isset( $data['image'] ) ? esc_url_raw( $data['image'] ) : '';
         $post_type = isset( $data['post_type'] ) ? sanitize_text_field( $data['post_type'] ) : 'post';
-        $author_id = isset( $data['author_id'] ) ? (int) $data['author_id'] : get_current_user_id(); // Default to current logged-in user
         $post_status = isset( $data['post_status'] ) ? sanitize_text_field( $data['post_status'] ) : '';
+
+        $current_user_id = get_current_user_id();
+
+        $author_id = isset( $data['author_id'] )
+            ? (int) $data['author_id']
+            : $current_user_id;
+
+        if ( $author_id <= 0 ) {
+            return new WP_Error( 'invalid_author', 'Invalid author selected.', [ 'status' => 400 ] );
+        }
+
+        $author = get_userdata( $author_id );
+
+        if ( ! $author instanceof WP_User ) {
+            return new WP_Error( 'invalid_author', 'Selected author does not exist.', [ 'status' => 400 ] );
+        }
+
+        if ( ! user_can( $author_id, 'edit_posts' ) ) {
+            return new WP_Error( 'invalid_author', 'Selected author cannot create posts.', [ 'status' => 400 ] );
+        }
+
+        // Validate taxonomy names
+        if ( empty( $category_main ) ) { return new WP_Error( 'missing_category_taxonomy', 'Category taxonomy is required.', [ 'status' => 400 ] ); }
+
+        if ( empty( $tags_main ) ) { return new WP_Error( 'missing_tags_taxonomy', 'Tags taxonomy is required.', [ 'status' => 400 ] ); }
+
+        if ( ! taxonomy_exists( $category_main ) ) { return new WP_Error( 'invalid_category_taxonomy', sprintf( 'Category taxonomy "%s" does not exist.', $category_main ), [ 'status' => 400 ] ); }
+
+        if ( ! taxonomy_exists( $tags_main ) ) { return new WP_Error( 'invalid_tags_taxonomy', sprintf( 'Tags taxonomy "%s" does not exist.', $tags_main ), [ 'status' => 400 ] ); }
+
+        if ( ! post_type_exists( $post_type ) ) { return new WP_Error( 'invalid_post_type', sprintf( 'Invalid post type "%s".', $post_type ), [ 'status' => 400 ] ); }
+
+        $allowed_statuses = array(
+            'draft',
+            'pending',
+            'publish',
+            'private'
+        );
+
+        if ( ! in_array( $post_status, $allowed_statuses, true ) ) { return new WP_Error( 'invalid_post_status', sprintf( 'Invalid post status "%s".', $post_status ), [ 'status' => 400 ] ); }
+
+        if ( empty( $author_id ) ) { return new WP_Error( 'invalid_user', 'Unable to determine authenticated user.', [ 'status' => 403 ] ); }
     
         // Handle category assignment
         $cat_exists = get_term_by( 'slug', $category, $category_main ); // Get term by slug
@@ -211,7 +305,18 @@ class COPYREAP_REST_API_Endpoints {
             'post_type'    => $post_type,
             'post_author'  => $author_id,
         ];
-    
+
+        if ( ! empty( $image_url ) ) {
+
+            $image_validation = COPYREAP_REST_API_Image::copyreap_validate_image_url(
+                $image_url
+            );
+
+            if ( is_wp_error( $image_validation ) ) {
+                return $image_validation;
+            }
+        }
+
         // Insert the post into the database
         $post_id = wp_insert_post( $postarr );
         if ( $post_id ) {
@@ -221,10 +326,20 @@ class COPYREAP_REST_API_Endpoints {
     
             // Handle the post image if provided
             if ( $image_url ) {
-                $image_id = COPYREAP_REST_API_Image::copyreap_handle_image( $image_url, $post_id );
-                if ( $image_id ) {
-                    set_post_thumbnail( $post_id, $image_id );
-                }
+                $image_id = COPYREAP_REST_API_Image::copyreap_handle_image(
+                    $image_url,
+                    $post_id
+                );
+
+                if ( is_wp_error( $image_id ) ) {
+                    wp_delete_post(
+                        $post_id,
+                        true
+                    );
+                    return $image_id;
+                } 
+                
+                if ( $image_id ) { set_post_thumbnail( $post_id, $image_id ); }
             }
     
             return new WP_REST_Response( [
@@ -239,10 +354,20 @@ class COPYREAP_REST_API_Endpoints {
     
     // Update Post
     public function copyreap_update_post( $data ) {
+
+        $rate_limit = $this->copyreap_rate_limit_check(
+            'copyreap_create_' . get_current_user_id(),
+            20
+        );
+
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         // Handle post update logic
         $post_id = (int) $data['id'];
         $title = isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : '';
-        $content = isset( $data['content'] ) ? sanitize_textarea_field( $data['content'] ) : '';
+        $content = isset( $data['content'] ) ? wp_kses_post( $data['content'] ) : '';
         $excerpt = isset( $data['excerpt'] ) ? sanitize_textarea_field( $data['excerpt'] ) : '';
         $category = isset( $data['category'] ) ? (int) $data['category'] : '';
         $tags = isset( $data['tags'] ) ? sanitize_text_field( $data['tags'] ) : '';
@@ -269,12 +394,25 @@ class COPYREAP_REST_API_Endpoints {
 
         $updated_post_id = wp_update_post( $postarr );
         if ( $updated_post_id ) {
-            if ($image_url) {
-                $image_id = copyreap_handle_image($image_url, $updated_post_id);
-                if ($image_id) {
-                    set_post_thumbnail($updated_post_id, $image_id);
+            if ( $image_url ) {
+
+                $image_id = COPYREAP_REST_API_Image::copyreap_handle_image(
+                    $image_url,
+                    $updated_post_id
+                );
+
+                if ( is_wp_error( $image_id ) ) {
+                    return $image_id;
+                }
+
+                if ( $image_id ) {
+                    set_post_thumbnail(
+                        $updated_post_id,
+                        $image_id
+                    );
                 }
             }
+            
             return new WP_REST_Response( [
                 'message' => 'Post updated successfully',
                 'status'  => 200,
@@ -287,6 +425,16 @@ class COPYREAP_REST_API_Endpoints {
 
     // Delete Post
     public function copyreap_delete_post( $data ) {
+
+        $rate_limit = $this->copyreap_rate_limit_check(
+            'copyreap_delete_' . get_current_user_id(),
+            10
+        );
+
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         // Handle post deletion logic
         $post_id = (int) $data['id'];
         if ( wp_delete_post( $post_id, true ) ) {
@@ -301,6 +449,16 @@ class COPYREAP_REST_API_Endpoints {
 
     // Fetch categories
     public function copyreap_get_categories() {
+
+        $rate_limit = $this->copyreap_rate_limit_check(
+            'copyreap_categories_' . get_current_user_id(),
+            60
+        );
+
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         $categories = get_categories( ['hide_empty' => false] );
         $response = [];
         
@@ -317,6 +475,16 @@ class COPYREAP_REST_API_Endpoints {
 
     // Fetch tags
     public function copyreap_get_tags() {
+
+        $rate_limit = $this->copyreap_rate_limit_check(
+            'copyreap_tags_' . get_current_user_id(),
+            60
+        );
+
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         $tags = get_tags( ['hide_empty' => false] );
         $response = [];
         
@@ -333,6 +501,16 @@ class COPYREAP_REST_API_Endpoints {
 
     // Fetch post types
     public function copyreap_get_post_types() {
+
+        $rate_limit = $this->copyreap_rate_limit_check(
+            'copyreap_post_types_' . get_current_user_id(),
+            60
+        );
+
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         $post_types = get_post_types( ['public' => true], 'objects' );
         $response = [];
 
@@ -348,6 +526,16 @@ class COPYREAP_REST_API_Endpoints {
 
     // Fetch Taxonomy by post-type
     public function copyreap_get_taxonomy_by_post_type( $data ) {
+
+        $rate_limit = $this->copyreap_rate_limit_check(
+            'copyreap_taxonomies_' . get_current_user_id(),
+            60
+        );
+
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         $post_type = $data['post_type'];
     
         // Check if the post type is valid
@@ -415,6 +603,16 @@ class COPYREAP_REST_API_Endpoints {
 
     // Fetch the list of Dante authors
     public function copyreap_get_dante_users() {
+
+        $rate_limit = $this->copyreap_rate_limit_check(
+            'copyreap_authors_' . get_current_user_id(),
+            60
+        );
+
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         // Query all users without filtering by meta_key
         $args = [
             'fields' => ['ID', 'user_login', 'user_email'],  // Specify the fields you want to return

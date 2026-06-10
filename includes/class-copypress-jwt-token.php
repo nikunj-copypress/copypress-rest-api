@@ -1,17 +1,21 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 if (!class_exists('COPYREAP_JWT_Token')) {
     class COPYREAP_JWT_Token {
         private $secret_key;
 
         public function __construct() {
             // Use a secret key from wp-config.php if defined
-            $this->secret_key = defined('COPYREAP_JWT_SECRET_KEY') ? COPYREAP_JWT_SECRET_KEY : '826657a98e396172f8aed51d110d529d';
+            $this->secret_key = defined('COPYREAP_JWT_SECRET_KEY') ? COPYREAP_JWT_SECRET_KEY : wp_salt('auth');
         }
 
         // Generate JWT Token
         public function copyreap_generate_token($user) {
             $issued_at = time();
-            $expiration_time = $issued_at + 7200; // Token expires in 2 hour
+            $expiration_time = $issued_at + DAY_IN_SECONDS; 
             
             $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
             $payload = json_encode([
@@ -35,21 +39,33 @@ if (!class_exists('COPYREAP_JWT_Token')) {
 
         // Validate JWT Token
         public function copyreap_validate_token($token) {
-            if (!$token) return false;
 
-            $token_parts = explode('.', $token);
-            if (count($token_parts) !== 3) return false;
+            if (empty($token)) { return false; }
 
-            list($header, $payload, $signature) = $token_parts;
+            $parts = explode('.', $token);
 
-            // Verify signature
-            $expected_signature = hash_hmac('sha256', $header . '.' . $payload, $this->secret_key, true);
-            $expected_signature = $this->copyreap_base64UrlEncode($expected_signature);
-            if (!hash_equals($expected_signature, $signature)) return false;
+            if (count($parts) !== 3) { return false; }
 
-            // Decode payload and check expiration
-            $payload_data = json_decode(base64_decode($payload), true);
-            if (!$payload_data || time() > $payload_data['exp']) return false;
+            list($header, $payload, $signature) = $parts;
+
+            $expected_signature = hash_hmac(
+                'sha256',
+                $header . '.' . $payload,
+                $this->secret_key,
+                true
+            );
+
+            $expected_signature = $this->copyreap_base64UrlEncode( $expected_signature );
+
+            if (!hash_equals($expected_signature, $signature)) {
+                return false;
+            }
+
+            $payload_data = json_decode( $this->copyreap_base64UrlDecode($payload), true );
+
+            if ( empty($payload_data) || !isset($payload_data['exp']) ) { return false; }
+
+            if (time() >= $payload_data['exp']) { return false; }
 
             return $payload_data['data'];
         }
@@ -57,6 +73,20 @@ if (!class_exists('COPYREAP_JWT_Token')) {
         // Helper: Base64 URL Encode
         private function copyreap_base64UrlEncode($data) {
             return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+        }
+
+        // Helper: Base64 URL Decode
+        private function copyreap_base64UrlDecode($data) {
+
+            $remainder = strlen($data) % 4;
+
+            if ($remainder) {
+                $data .= str_repeat('=', 4 - $remainder);
+            }
+
+            return base64_decode(
+                strtr($data, '-_', '+/')
+            );
         }
     }
 }

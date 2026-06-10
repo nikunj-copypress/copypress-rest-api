@@ -45,6 +45,17 @@ The **COPYPRESS REST API** plugin extends the WordPress REST API with custom end
    - Response: List of categories (hierarchical taxonomies) and tags (non-hierarchical taxonomies).
 
 == Changelog ==
+= 1.3 =
+* Secure Image Upload Validation
+* File Extension, MIME Type & Image Verification
+* JWT Authentication & Authorization
+* JWT Signature & Expiration Validation
+* Role-Based Access Control
+* API Rate Limiting
+* Post Type, Author, Taxonomy & Post Status Validation
+* Content Sanitization
+
+== Changelog ==
 = 1.2 =
 * Role-based permissions for Administrator, Editor, and Contributor to publish content have been added.
 
