@@ -1,7 +1,7 @@
 # Copypress-Rest-API
 The **COPYPRESS REST API** plugin extends the WordPress REST API with custom endpoints for managing posts, categories, tags, post types, and taxonomies.
 
-== Installation ==
+### Installation
 1. Download the plugin files.
 2. Upload the plugin folder to the `/wp-content/plugins/` directory.
 3. Activate the plugin from the WordPress admin panel.
@@ -44,8 +44,9 @@ The **COPYPRESS REST API** plugin extends the WordPress REST API with custom end
 8. `GET /copypress-api/v1/get-taxonomies/{post_type}` - Get all taxonomies (categories and tags) associated with a specific post type.
    - Response: List of categories (hierarchical taxonomies) and tags (non-hierarchical taxonomies).
 
-== Changelog ==
-= 1.3 =
+## Changelog
+
+### 1.3
 * Secure Image Upload Validation
 * File Extension, MIME Type & Image Verification
 * JWT Authentication & Authorization
@@ -55,15 +56,13 @@ The **COPYPRESS REST API** plugin extends the WordPress REST API with custom end
 * Post Type, Author, Taxonomy & Post Status Validation
 * Content Sanitization
 
-== Changelog ==
-= 1.2 =
+### 1.2
 * Role-based permissions for Administrator, Editor, and Contributor to publish content have been added.
 
-= 1.1 =
+### 1.1
 * added permission check.
 * added login with token solution.
 * removed api-key based functionality.
 
-== Changelog ==
-= 1.0 =
+### 1.0
 * Initial release with functionality for post creation, update, deletion, and fetching categories, tags, post types, and taxonomies.
