@@ -2,8 +2,9 @@
 Contributors: copypressdev  
 Tags: REST API, posts, categories, tags, image upload
 Requires at least: 6.4  
-Tested up to: 6.7  
-Stable tag: 1.2 
+Tested up to: 7.0 
+Requires PHP: 7.4 
+Stable tag: 1.3 
 License: GPL2  
 License URI: http://www.gnu.org/licenses/gpl-2.0.html  
 
@@ -76,6 +77,17 @@ This plugin allows cross-origin requests for all the REST API endpoints, enablin
 == Usage ==
 Once the plugin is activated, the custom API routes are available for interaction with posts, categories, tags, post types, and taxonomies. You can make requests to the respective endpoints from any external application or client that can interact with REST APIs. To create or update posts, a valid JWT token must be provided in the Authorization header as:
 Authorization: Bearer YOUR_TOKEN_HERE
+
+== Changelog ==
+= 1.3 =
+* Secure Image Upload Validation
+* File Extension, MIME Type & Image Verification
+* JWT Authentication & Authorization
+* JWT Signature & Expiration Validation
+* Role-Based Access Control
+* API Rate Limiting
+* Post Type, Author, Taxonomy & Post Status Validation
+* Content Sanitization
 
 == Changelog ==
 = 1.2 =
