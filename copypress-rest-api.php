@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Copypress Rest API
  * Description: A plugin to post management API for integration with external applications with image upload functionality.
- * Version: 1.3
+ * Version: 1.3.1
  * Requires at least: 6.4
  * Requires PHP: 7.4
  * Author: CopyPress

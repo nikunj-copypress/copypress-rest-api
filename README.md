@@ -13,16 +13,19 @@ The **COPYPRESS REST API** plugin extends the WordPress REST API with custom end
    - `password` (string): WordPress password
 
 2. `POST /copypress-api/v1/posts` - Create a new post.
-   - Request Body: 
+   - Request Body:
      - `title` (string): The title of the post.
      - `content` (string): The content of the post.
      - `excerpt` (string, optional): The excerpt of the post.
-     - `category` (int, optional): The category ID of the post.
-     - `tags` (string, optional): Comma-separated list of tag slugs.
+     - `category_main` (string): The category taxonomy name.
+     - `category` (string): The category name or slug.
+     - `tags_main` (string, optional): The tags taxonomy name. Required only when tags are provided.
+     - `tags` (string, optional): Comma-separated list of tag names or slugs.
      - `image` (string, optional): URL of an image to be set as the post's featured image.
      - `post_type` (string, optional): The post type (default: `post`).
      - `author_id` (int, optional): The ID of the post author (default: current user).
      - `post_status` (string): Post publish status.
+   - Note: Tags are optional. If no tags are provided, `tags_main` can be empty and tag processing will be skipped.
    - Response: Success message, HTTP status code, and created post object.
 
 3. `PUT /copypress-api/v1/posts/{id}` - Update an existing post.
@@ -45,6 +48,11 @@ The **COPYPRESS REST API** plugin extends the WordPress REST API with custom end
    - Response: List of categories (hierarchical taxonomies) and tags (non-hierarchical taxonomies).
 
 ## Changelog
+
+### 1.3.1
+* Made tag taxonomy optional when no tags are provided.
+* Skip tag validation and assignment when no tags are selected.
+* Preserved existing category and tag assignment behaviour.
 
 ### 1.3
 * Secure Image Upload Validation
