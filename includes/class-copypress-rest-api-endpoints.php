@@ -206,16 +206,45 @@ class COPYREAP_REST_API_Endpoints {
             return $rate_limit;
         }
 
-        $title = isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : '';
-        $content = isset( $data['content'] ) ? wp_kses_post( $data['content'] ) : '';
-        $excerpt = isset( $data['excerpt'] ) ? sanitize_textarea_field( $data['excerpt'] ) : '';
-        $category_main = isset( $data['category_main'] ) ? sanitize_text_field( $data['category_main'] ) : '';
-        $category = isset( $data['category'] ) ? sanitize_text_field( $data['category'] ) : '';
-        $tags_main = isset( $data['tags_main'] ) ? sanitize_text_field( $data['tags_main'] ) : '';
-        $tags = isset( $data['tags'] ) ? sanitize_text_field( $data['tags'] ) : '';
-        $image_url = isset( $data['image'] ) ? esc_url_raw( $data['image'] ) : '';
-        $post_type = isset( $data['post_type'] ) ? sanitize_text_field( $data['post_type'] ) : 'post';
-        $post_status = isset( $data['post_status'] ) ? sanitize_text_field( $data['post_status'] ) : '';
+        $title = isset( $data['title'] )
+            ? sanitize_text_field( $data['title'] )
+            : '';
+
+        $content = isset( $data['content'] )
+            ? wp_kses_post( $data['content'] )
+            : '';
+
+        $excerpt = isset( $data['excerpt'] )
+            ? sanitize_textarea_field( $data['excerpt'] )
+            : '';
+
+        $category_main = isset( $data['category_main'] )
+            ? sanitize_text_field( $data['category_main'] )
+            : '';
+
+        $category = isset( $data['category'] )
+            ? sanitize_text_field( $data['category'] )
+            : '';
+
+        $tags_main = isset( $data['tags_main'] )
+            ? sanitize_text_field( $data['tags_main'] )
+            : '';
+
+        $tags = isset( $data['tags'] )
+            ? sanitize_text_field( $data['tags'] )
+            : '';
+
+        $image_url = isset( $data['image'] )
+            ? esc_url_raw( $data['image'] )
+            : '';
+
+        $post_type = isset( $data['post_type'] )
+            ? sanitize_text_field( $data['post_type'] )
+            : 'post';
+
+        $post_status = isset( $data['post_status'] )
+            ? sanitize_text_field( $data['post_status'] )
+            : '';
 
         $current_user_id = get_current_user_id();
 
@@ -224,132 +253,342 @@ class COPYREAP_REST_API_Endpoints {
             : $current_user_id;
 
         if ( $author_id <= 0 ) {
-            return new WP_Error( 'invalid_author', 'Invalid author selected.', [ 'status' => 400 ] );
+            return new WP_Error(
+                'invalid_author',
+                'Invalid author selected.',
+                [ 'status' => 400 ]
+            );
         }
 
         $author = get_userdata( $author_id );
 
         if ( ! $author instanceof WP_User ) {
-            return new WP_Error( 'invalid_author', 'Selected author does not exist.', [ 'status' => 400 ] );
+            return new WP_Error(
+                'invalid_author',
+                'Selected author does not exist.',
+                [ 'status' => 400 ]
+            );
         }
 
         if ( ! user_can( $author_id, 'edit_posts' ) ) {
-            return new WP_Error( 'invalid_author', 'Selected author cannot create posts.', [ 'status' => 400 ] );
+            return new WP_Error(
+                'invalid_author',
+                'Selected author cannot create posts.',
+                [ 'status' => 400 ]
+            );
         }
 
-        // Validate taxonomy names
-        if ( empty( $category_main ) ) { return new WP_Error( 'missing_category_taxonomy', 'Category taxonomy is required.', [ 'status' => 400 ] ); }
+        /*
+        * Validate taxonomy names.
+        *
+        * Category taxonomy is required.
+        * Tags are optional, so tags_main is only required
+        * when actual tags are provided.
+        */
 
-        if ( empty( $tags_main ) ) { return new WP_Error( 'missing_tags_taxonomy', 'Tags taxonomy is required.', [ 'status' => 400 ] ); }
+        if ( empty( $category_main ) ) {
+            return new WP_Error(
+                'missing_category_taxonomy',
+                'Category taxonomy is required.',
+                [ 'status' => 400 ]
+            );
+        }
 
-        if ( ! taxonomy_exists( $category_main ) ) { return new WP_Error( 'invalid_category_taxonomy', sprintf( 'Category taxonomy "%s" does not exist.', $category_main ), [ 'status' => 400 ] ); }
+        if ( ! taxonomy_exists( $category_main ) ) {
+            return new WP_Error(
+                'invalid_category_taxonomy',
+                sprintf(
+                    'Category taxonomy "%s" does not exist.',
+                    $category_main
+                ),
+                [ 'status' => 400 ]
+            );
+        }
 
-        if ( ! taxonomy_exists( $tags_main ) ) { return new WP_Error( 'invalid_tags_taxonomy', sprintf( 'Tags taxonomy "%s" does not exist.', $tags_main ), [ 'status' => 400 ] ); }
+        /*
+        * Tags are optional.
+        *
+        * If tags are provided, tags_main must also be provided
+        * and must be a valid taxonomy.
+        */
+        if ( ! empty( trim( $tags ) ) ) {
 
-        if ( ! post_type_exists( $post_type ) ) { return new WP_Error( 'invalid_post_type', sprintf( 'Invalid post type "%s".', $post_type ), [ 'status' => 400 ] ); }
+            if ( empty( $tags_main ) ) {
+                return new WP_Error(
+                    'missing_tags_taxonomy',
+                    'Tags taxonomy is required when tags are provided.',
+                    [ 'status' => 400 ]
+                );
+            }
+
+            if ( ! taxonomy_exists( $tags_main ) ) {
+                return new WP_Error(
+                    'invalid_tags_taxonomy',
+                    sprintf(
+                        'Tags taxonomy "%s" does not exist.',
+                        $tags_main
+                    ),
+                    [ 'status' => 400 ]
+                );
+            }
+        }
+
+        if ( ! post_type_exists( $post_type ) ) {
+            return new WP_Error(
+                'invalid_post_type',
+                sprintf(
+                    'Invalid post type "%s".',
+                    $post_type
+                ),
+                [ 'status' => 400 ]
+            );
+        }
 
         $allowed_statuses = array(
             'draft',
             'pending',
             'publish',
-            'private'
+            'private',
         );
 
-        if ( ! in_array( $post_status, $allowed_statuses, true ) ) { return new WP_Error( 'invalid_post_status', sprintf( 'Invalid post status "%s".', $post_status ), [ 'status' => 400 ] ); }
+        if ( ! in_array( $post_status, $allowed_statuses, true ) ) {
+            return new WP_Error(
+                'invalid_post_status',
+                sprintf(
+                    'Invalid post status "%s".',
+                    $post_status
+                ),
+                [ 'status' => 400 ]
+            );
+        }
 
-        if ( empty( $author_id ) ) { return new WP_Error( 'invalid_user', 'Unable to determine authenticated user.', [ 'status' => 403 ] ); }
-    
-        // Handle category assignment
-        $cat_exists = get_term_by( 'slug', $category, $category_main ); // Get term by slug
-        if ( !$cat_exists ) {
-            // Create category if not exists
-            $cat_created = wp_insert_term( $category, $category_main );
-            if ( !is_wp_error( $cat_created ) ) {
-                $cat_id = $cat_created['term_id'];
-            }
-        } else {
-            $cat_id = $cat_exists->term_id;
+        if ( empty( $author_id ) ) {
+            return new WP_Error(
+                'invalid_user',
+                'Unable to determine authenticated user.',
+                [ 'status' => 403 ]
+            );
         }
-    
-        // Handle tag assignment
-        $tags_array = explode( ',', $tags ); // Split tags by comma
-        $tags_ids = [];
-        foreach ( $tags_array as $tag ) {
-            $tag_exists = get_term_by( 'slug', $tag, $tags_main ); // Get term by slug
-            if ( !$tag_exists ) {
-                // If the tag does not exist, create it
-                $tag_created = wp_insert_term( $tag, $tags_main );
-                if ( !is_wp_error( $tag_created ) ) {
-                    $tags_ids[] = $tag_created['term_id']; // Add the newly created term ID to the list
-                }
-            } else {
-                // If the tag exists, get its term ID
-                $tags_ids[] = $tag_exists->term_id;
-            }
-        }
-    
-        // Validate required fields
+
+        /*
+        * Validate required fields before creating terms.
+        */
         if ( empty( $title ) ) {
-            return new WP_Error( 'missing_title', 'Please enter a title.', [ 'status' => 400 ] );
+            return new WP_Error(
+                'missing_title',
+                'Please enter a title.',
+                [ 'status' => 400 ]
+            );
         }
+
         if ( empty( $content ) ) {
-            return new WP_Error( 'missing_content', 'Please enter content.', [ 'status' => 400 ] );
+            return new WP_Error(
+                'missing_content',
+                'Please enter content.',
+                [ 'status' => 400 ]
+            );
         }
-    
-        // Prepare the post array
-        $postarr = [
+
+        /*
+        * Handle category assignment.
+        */
+        $cat_id = 0;
+
+        if ( ! empty( $category ) ) {
+
+            $cat_exists = get_term_by(
+                'slug',
+                $category,
+                $category_main
+            );
+
+            if ( ! $cat_exists ) {
+
+                // Create category if it does not exist.
+                $cat_created = wp_insert_term(
+                    $category,
+                    $category_main
+                );
+
+                if ( ! is_wp_error( $cat_created ) ) {
+                    $cat_id = $cat_created['term_id'];
+                } else {
+                    return new WP_Error(
+                        'category_creation_failed',
+                        sprintf(
+                            'Unable to create category "%s".',
+                            $category
+                        ),
+                        [ 'status' => 400 ]
+                    );
+                }
+
+            } else {
+                $cat_id = $cat_exists->term_id;
+            }
+        }
+
+        /*
+        * Handle tag assignment.
+        *
+        * Tags are optional. If no tags are provided,
+        * no tag processing will be performed.
+        */
+        $tags_ids = array();
+
+        if ( ! empty( trim( $tags ) ) ) {
+
+            $tags_array = array_filter(
+                array_map(
+                    'trim',
+                    explode( ',', $tags )
+                )
+            );
+
+            foreach ( $tags_array as $tag ) {
+
+                if ( empty( $tag ) ) {
+                    continue;
+                }
+
+                $tag_exists = get_term_by(
+                    'slug',
+                    $tag,
+                    $tags_main
+                );
+
+                if ( ! $tag_exists ) {
+
+                    // Create tag if it does not exist.
+                    $tag_created = wp_insert_term(
+                        $tag,
+                        $tags_main
+                    );
+
+                    if ( ! is_wp_error( $tag_created ) ) {
+                        $tags_ids[] = $tag_created['term_id'];
+                    } else {
+                        return new WP_Error(
+                            'tag_creation_failed',
+                            sprintf(
+                                'Unable to create tag "%s".',
+                                $tag
+                            ),
+                            [ 'status' => 400 ]
+                        );
+                    }
+
+                } else {
+
+                    // Use existing tag.
+                    $tags_ids[] = $tag_exists->term_id;
+                }
+            }
+        }
+
+        /*
+        * Prepare the post array.
+        */
+        $postarr = array(
             'post_title'   => $title,
             'post_content' => $content,
             'post_excerpt' => $excerpt,
             'post_status'  => $post_status,
             'post_type'    => $post_type,
             'post_author'  => $author_id,
-        ];
+        );
 
+        /*
+        * Validate image URL if provided.
+        */
         if ( ! empty( $image_url ) ) {
 
-            $image_validation = COPYREAP_REST_API_Image::copyreap_validate_image_url(
-                $image_url
-            );
+            $image_validation =
+                COPYREAP_REST_API_Image::copyreap_validate_image_url(
+                    $image_url
+                );
 
             if ( is_wp_error( $image_validation ) ) {
                 return $image_validation;
             }
         }
 
-        // Insert the post into the database
+        /*
+        * Insert the post into the database.
+        */
         $post_id = wp_insert_post( $postarr );
+
         if ( $post_id ) {
-            // Set category and tags for the post
-            wp_set_object_terms( $post_id, $cat_id, $category_main );
-            wp_set_object_terms( $post_id, $tags_ids, $tags_main );
-    
-            // Handle the post image if provided
-            if ( $image_url ) {
-                $image_id = COPYREAP_REST_API_Image::copyreap_handle_image(
-                    $image_url,
-                    $post_id
+
+            /*
+            * Set category for the post.
+            */
+            if ( ! empty( $cat_id ) ) {
+                wp_set_object_terms(
+                    $post_id,
+                    $cat_id,
+                    $category_main
                 );
+            }
+
+            /*
+            * Set tags only when tags were provided.
+            *
+            * This prevents WordPress from trying to process
+            * an empty tags taxonomy.
+            */
+            if ( ! empty( $tags_ids ) && ! empty( $tags_main ) ) {
+                wp_set_object_terms(
+                    $post_id,
+                    $tags_ids,
+                    $tags_main
+                );
+            }
+
+            /*
+            * Handle the post image if provided.
+            */
+            if ( ! empty( $image_url ) ) {
+
+                $image_id =
+                    COPYREAP_REST_API_Image::copyreap_handle_image(
+                        $image_url,
+                        $post_id
+                    );
 
                 if ( is_wp_error( $image_id ) ) {
+
                     wp_delete_post(
                         $post_id,
                         true
                     );
+
                     return $image_id;
-                } 
-                
-                if ( $image_id ) { set_post_thumbnail( $post_id, $image_id ); }
+                }
+
+                if ( $image_id ) {
+                    set_post_thumbnail(
+                        $post_id,
+                        $image_id
+                    );
+                }
             }
-    
-            return new WP_REST_Response( [
-                'message' => 'Post created successfully',
-                'status'  => 200,
-                'data'    => get_post( $post_id ),
-            ], 200 );
+
+            return new WP_REST_Response(
+                [
+                    'message' => 'Post created successfully',
+                    'status'  => 200,
+                    'data'    => get_post( $post_id ),
+                ],
+                200
+            );
         }
-    
-        return new WP_Error( 'create_failed', 'Post creation failed', [ 'status' => 500 ] );
+
+        return new WP_Error(
+            'create_failed',
+            'Post creation failed',
+            [ 'status' => 500 ]
+        );
     }
     
     // Update Post
